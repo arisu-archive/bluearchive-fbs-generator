@@ -9,6 +9,7 @@ require (
 	github.com/dave/jennifer v1.7.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
+	golang.org/x/text v0.23.0
 )
 
 require github.com/mattn/go-pointer v0.0.1 // indirect
