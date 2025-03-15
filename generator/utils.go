@@ -81,7 +81,10 @@ func getBaseGoType(field parser.Field) *Statement {
 	case "double":
 		return Float64()
 	default:
-		// Default to interface{} for unknown types
-		return Id(toExportedName(field.Type))
+		// TODO: Use more generic method to handle struct references
+		if !field.IsPrimitive() && strings.Contains(field.Name, "data_list") {
+			return Id(toExportedName(field.Type))
+		}
+		return Id(field.Type)
 	}
 }

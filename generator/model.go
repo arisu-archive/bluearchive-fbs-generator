@@ -124,7 +124,7 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 					convertCall := convertFunc(fieldAccessor)
 					if !isPrimitive {
 						fieldAccessor = Id("int32").Call(fieldAccessor)
-						convertCall = Id(toExportedName(field.Type)).Call(convertFunc(fieldAccessor))
+						convertCall = Id(field.Type).Call(convertFunc(fieldAccessor))
 					} else if field.IsString {
 						convertCall = convertFunc(Id("string").Call(fieldAccessor))
 					}
@@ -140,7 +140,7 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 					convertCall = convertFunc(Id("string").Call(fieldAccessor))
 				} else if !field.IsPrimitive() {
 					// It is enum type
-					convertCall = Id(toExportedName(field.Type)).Call(convertFunc(Id("int32").Call(fieldAccessor)))
+					convertCall = Id(field.Type).Call(convertFunc(Id("int32").Call(fieldAccessor)))
 				}
 				assign.Add(convertCall)
 			}
