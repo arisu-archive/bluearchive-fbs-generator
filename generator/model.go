@@ -27,6 +27,7 @@ func generateModel(s *parser.Schema, pkgName, outputDir string) error {
 			generateStructType(f, def)
 			generateStructMarshaler(f, def)
 			generateStructUnmarshaler(f, def)
+			generateStructName(f, def)
 			written = true
 		case parser.TypeUnion:
 			generateUnionType(f, def)
@@ -38,7 +39,7 @@ func generateModel(s *parser.Schema, pkgName, outputDir string) error {
 
 	if written {
 		// Save the generated code
-		return writeFile(f, outputDir, fmt.Sprintf("%s.go", toExportedName(s.FileName)))
+		return writeFile(f, outputDir, fmt.Sprintf("%s.go", toModelName(s.FileName)))
 	}
 
 	return nil
@@ -46,7 +47,7 @@ func generateModel(s *parser.Schema, pkgName, outputDir string) error {
 
 // generateStructType creates a Go struct for a FlatBuffers struct or table.
 func generateStructType(f *File, def parser.Definition) {
-	modelName := toExportedName(def.Name)
+	modelName := toModelName(def.Name)
 	// Add documentation for the struct
 	f.Comment(fmt.Sprintf("%s represents a FlatBuffers %s", modelName, getDefTypeStr(def.Type)))
 	// Import the flatbuffers package
@@ -74,7 +75,7 @@ func generateStructType(f *File, def parser.Definition) {
 }
 
 func generateStructUnmarshaler(f *File, def parser.Definition) {
-	modelName := toExportedName(def.Name)
+	modelName := toModelName(def.Name)
 	f.Comment("Unmarshal unmarshals the struct from a FlatBuffers buffer")
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("Unmarshal").Params(
 		Id("data").Index().Add(Byte()),
@@ -101,7 +102,7 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 			assign := g.Id("t").Dot(toExportedName(field.Name)).Op("=")
 			// TODO: Use more generic method to handle struct references
 			if strings.Contains(field.Name, "data_list") {
-				assign.Make(Id("[]"+toExportedName(field.Type)), Id("e").Dot(toExportedName(field.Name)+"Length").Call())
+				assign.Make(Id("[]"+toModelName(field.Type)), Id("e").Dot(toExportedName(field.Name)+"Length").Call())
 				g.For(Id("i").Op(":=").Range().Id("e").Dot(toExportedName(field.Name) + "Length").Call()).BlockFunc(func(g *Group) {
 					g.Id("d").Op(":=").New(Id(field.Type))
 					g.If(Op("!").Id("e").Dot(toExportedName(field.Name)).Call(Id("d"), Id("i"))).Block(
@@ -157,7 +158,7 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 	convertFunc := func(field Code) Code {
 		return Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(field, Id("t").Dot("FlatBuffer").Dot("TableKey"))
 	}
-	modelName := toExportedName(def.Name)
+	modelName := toModelName(def.Name)
 	f.Comment("MarshalModel marshals the struct into flatbuffers offset")
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("MarshalModel").Params(
 		Id("b").Op("*").Qual("github.com/google/flatbuffers/go", "Builder"),
@@ -226,6 +227,15 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 			Id("b").Dot("FinishedBytes").Call(),
 			Nil(),
 		)
+	})
+	f.Line()
+}
+
+func generateStructName(f *File, def parser.Definition) {
+	modelName := toModelName(def.Name)
+	f.Comment("Name returns the name of the struct")
+	f.Func().Params(Id(modelName)).Id("FlatDataName").Params().String().BlockFunc(func(g *Group) {
+		g.Return(Lit(modelName))
 	})
 	f.Line()
 }
