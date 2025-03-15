@@ -103,7 +103,7 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 			if strings.Contains(field.Name, "data_list") {
 				assign.Make(Id("[]"+toExportedName(field.Type)), Id("e").Dot(toExportedName(field.Name)+"Length").Call())
 				g.For(Id("i").Op(":=").Range().Id("e").Dot(toExportedName(field.Name) + "Length").Call()).BlockFunc(func(g *Group) {
-					g.Id("d").Op(":=").New(Id(strcase.ToCamel(field.Type)))
+					g.Id("d").Op(":=").New(Id(field.Type))
 					g.If(Op("!").Id("e").Dot(toExportedName(field.Name)).Call(Id("d"), Id("i"))).Block(
 						Return(Qual("errors", "New").Call(Lit("failed to unmarshal data"))),
 					)
