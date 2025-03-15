@@ -2,22 +2,43 @@ package generator
 
 import (
 	"strings"
+	"unicode"
 
 	. "github.com/dave/jennifer/jen"
-
-	"github.com/iancoleman/strcase"
 
 	"github.com/arisu-archive/bluearchive-fbs-generator/parser"
 )
 
-// Helper functions shared across generator files
+func toCamel(name string) string {
+	if name == "" {
+		return ""
+	}
 
-// toExportedName converts a field name to an exported Go identifier
-func toExportedName(name string) string {
-	return strcase.ToCamel(strings.ReplaceAll(name, "Excel", ""))
+	var result strings.Builder
+	upperNext := true
+
+	for _, r := range name {
+		switch {
+		case r == '_' || r == ' ' || r == '-':
+			upperNext = true
+		case upperNext:
+			result.WriteRune(unicode.ToUpper(r))
+			upperNext = false
+		default:
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
 }
 
-// getDefTypeStr returns a string representation of the definition type
+// toExportedName converts a field name to an exported Go identifier.
+func toExportedName(name string) string {
+	// It is camel but DO NOT make the character after number uppercase
+	return toCamel(strings.ReplaceAll(name, "Excel", "")) + "Dto"
+}
+
+// getDefTypeStr returns a string representation of the definition type.
 func getDefTypeStr(defType parser.SchemaType) string {
 	switch defType {
 	case parser.TypeStruct:
