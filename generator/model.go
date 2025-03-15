@@ -93,7 +93,7 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 
 	f.Comment("UnmarshalMessage unmarshals the struct from a FlatBuffers buffer")
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("UnmarshalMessage").Params(
-		Id("e").Op("*").Id(strcase.ToCamel(def.Name)),
+		Id("e").Op("*").Id(def.Name),
 	).Params(
 		Error(),
 	).BlockFunc(func(g *Group) {
@@ -125,6 +125,8 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 					if !isPrimitive {
 						fieldAccessor = Id("int32").Call(fieldAccessor)
 						convertCall = Id(toExportedName(field.Type)).Call(convertFunc(fieldAccessor))
+					} else if field.IsString {
+						convertCall = convertFunc(Id("string").Call(fieldAccessor))
 					}
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(convertCall)
 				})
@@ -174,7 +176,7 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 						g.Id("b").Dot("PrependUOffsetT").Call(Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Dot("MarshalModel").Call(Id("b")))
 					} else {
 						isPrimitive := field.IsPrimitive()
-						goType := getBaseGoType(field).GoString()
+						goType := strcase.ToCamel(getBaseGoType(field).GoString())
 						// If the field is not a primitive type, we need to wrap it in an Int32
 						fieldAccessorWrapper := fieldAccessor.Clone().Index(Id("i"))
 						if !isPrimitive {
@@ -185,7 +187,7 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 							fieldAccessorWrapper = Id("b").Dot("CreateString").Call(fieldAccessorWrapper)
 						}
 						// b.PrependXXX(fbsutils.Convert(t.FieldName))
-						g.Id("b").Dot("Prepend" + strcase.ToCamel(goType)).Call(convertFunc(fieldAccessorWrapper))
+						g.Id("b").Dot("Prepend" + goType).Call(convertFunc(fieldAccessorWrapper))
 					}
 				})
 				g.Id(def.Name+"Add"+toExportedName(field.Name)).Call(
