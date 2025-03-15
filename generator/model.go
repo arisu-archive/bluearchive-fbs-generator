@@ -114,15 +114,19 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 				g.For(Id("i").Op(":=").Range().Id("e").Dot(toExportedName(field.Name) + "Length").Call()).BlockFunc(func(g *Group) {
 					isPrimitive := field.IsPrimitive()
 					// If the field is not a primitive type, we need to wrap it in an Int32
-					fieldAccessorWrapper := Id("e").Dot(toExportedName(field.Name)).Call(Id("i"))
-					if !isPrimitive {
-						fieldAccessorWrapper = Id("int32").Call(fieldAccessorWrapper)
+					fieldAccessor := Id("e").Dot(toExportedName(field.Name)).Call(Id("i"))
+					convertFunc := func(field Code) Code {
+						return Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(
+							field,
+							Id("t").Dot("FlatBuffer").Dot("TableKey"),
+						)
 					}
-					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").
-						Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(
-						fieldAccessorWrapper,
-						Id("t").Dot("FlatBuffer").Dot("TableKey"),
-					)
+					convertCall := convertFunc(fieldAccessor)
+					if !isPrimitive {
+						fieldAccessor = Id("int32").Call(fieldAccessor)
+						convertCall = Id(toExportedName(field.Type)).Call(convertFunc(fieldAccessor))
+					}
+					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(convertCall)
 				})
 			} else if field.IsPrimitive() {
 				fieldAccessor := Id("e").Dot(toExportedName(field.Name)).Call()
