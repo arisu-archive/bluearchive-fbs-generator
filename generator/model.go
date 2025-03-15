@@ -128,14 +128,12 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 					}
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(convertCall)
 				})
-			} else if field.IsPrimitive() {
+			} else {
 				fieldAccessor := Id("e").Dot(toExportedName(field.Name)).Call()
 				if field.IsString {
 					fieldAccessor = Id("string").Call(fieldAccessor)
 				}
 				assign.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(fieldAccessor, Id("t").Dot("FlatBuffer").Dot("TableKey"))
-			} else {
-				assign.Id("e").Dot(toExportedName(field.Name))
 			}
 		}
 		g.Return(Nil())
