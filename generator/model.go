@@ -7,8 +7,6 @@ import (
 	. "github.com/dave/jennifer/jen"
 
 	"github.com/iancoleman/strcase"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 
 	"github.com/arisu-archive/bluearchive-fbs-generator/parser"
 )
@@ -192,7 +190,7 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 						g.Id("b").Dot("Prepend" + goType).Call(convertFunc(fieldAccessorWrapper))
 					}
 				})
-				g.Id(def.Name+"Add"+cases.Title(language.English).String(field.Name)).Call(
+				g.Id(def.Name+"Add"+toExportedName(field.Name)).Call(
 					Id("b"),
 					Id("b").Dot("EndVector").Call(Id("len").Call(fieldAccessor)),
 				)
@@ -201,7 +199,7 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 				if field.IsString {
 					fieldAccessor = Id("b").Dot("CreateString").Call(fieldAccessor)
 				}
-				g.Id(def.Name+"Add"+cases.Title(language.English).String(field.Name)).Call(
+				g.Id(def.Name+"Add"+toExportedName(field.Name)).Call(
 					Id("b"),
 					convertFunc(fieldAccessor),
 				)
