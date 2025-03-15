@@ -58,7 +58,7 @@ func generateStructType(f *File, def parser.Definition) {
 
 	// Add fields to the struct
 	fields := []Code{
-		Id("fbsutils").Dot("FlatBuffer"),
+		Qual("github.com/arisu-archive/bluearchive-fbs-utils", "FlatBuffer"),
 	}
 	for _, field := range def.Fields {
 		// Generate field with appropriate type
@@ -129,11 +129,18 @@ func generateStructUnmarshaler(f *File, def parser.Definition) {
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(convertCall)
 				})
 			} else {
-				fieldAccessor := Id("e").Dot(toExportedName(field.Name)).Call()
-				if field.IsString {
-					fieldAccessor = Id("string").Call(fieldAccessor)
+				convertFunc := func(field Code) Code {
+					return Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(field, Id("t").Dot("FlatBuffer").Dot("TableKey"))
 				}
-				assign.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(fieldAccessor, Id("t").Dot("FlatBuffer").Dot("TableKey"))
+				fieldAccessor := Id("e").Dot(toExportedName(field.Name)).Call()
+				convertCall := convertFunc(fieldAccessor)
+				if field.IsString {
+					convertCall = convertFunc(Id("string").Call(fieldAccessor))
+				} else if !field.IsPrimitive() {
+					// It is enum type
+					convertCall = Id(toExportedName(field.Type)).Call(convertFunc(Id("int32").Call(fieldAccessor)))
+				}
+				assign.Add(convertCall)
 			}
 		}
 		g.Return(Nil())
