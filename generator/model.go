@@ -180,6 +180,9 @@ func generateStructMarshaler(f *File, def parser.Definition) {
 						if !isPrimitive {
 							goType = "Int32"
 							fieldAccessorWrapper = Id("int32").Call(fieldAccessorWrapper)
+						} else if field.IsString {
+							goType = "UOffsetT"
+							fieldAccessorWrapper = Id("b").Dot("CreateString").Call(fieldAccessorWrapper)
 						}
 						// b.PrependXXX(fbsutils.Convert(t.FieldName))
 						g.Id("b").Dot("Prepend" + strcase.ToCamel(goType)).Call(convertFunc(fieldAccessorWrapper))
