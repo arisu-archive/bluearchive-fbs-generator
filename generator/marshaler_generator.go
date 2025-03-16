@@ -27,7 +27,7 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
 			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
 				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
 					Lit(
-						strings.ReplaceAll(strings.ReplaceAll(def.Name, "Excel", ""), "ExcelTable", ""),
+						strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
 					),
 				),
 			),

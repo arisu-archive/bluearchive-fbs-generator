@@ -16,7 +16,7 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 	handleFieldType := func(tableField *Statement, field parser.Field, val Code) {
 		switch {
 		case field.IsEnum:
-			tableField.Op("=").Add(Id(field.Type).Call(Id("int32").Call(fieldConverter(val))))
+			tableField.Op("=").Add(Id(field.Type).Call(fieldConverter(Id("int32").Call(val))))
 		case field.IsString:
 			tableField.Op("=").Add(fieldConverter(Id("string").Call(val)))
 		default:
@@ -34,7 +34,7 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
 				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
 					Lit(
-						strings.ReplaceAll(strings.ReplaceAll(def.Name, "Excel", ""), "ExcelTable", ""),
+						strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
 					),
 				),
 			),
@@ -64,6 +64,10 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 					excelFieldValue := excelField.Call(Id("i"))
 					if field.IsString {
 						excelFieldValue = Id("string").Call(excelFieldValue)
+					} else if field.IsEnum {
+						excelFieldValue = Id(field.Type).Call(fieldConverter(Id("int32").Call(excelFieldValue)))
+					} else if field.IsPrimitive() {
+						excelFieldValue = fieldConverter(excelFieldValue)
 					}
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelFieldValue)
 				})
