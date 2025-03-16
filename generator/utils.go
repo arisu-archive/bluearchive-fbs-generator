@@ -87,8 +87,10 @@ func getBaseGoType(field parser.Field) *Statement {
 	switch field.Type {
 	case "bool":
 		return Bool()
-	case "byte", "ubyte":
-		return Byte()
+	case "byte":
+		return Int8()
+	case "ubyte":
+		return Uint8()
 	case "short":
 		return Int16()
 	case "ushort":
