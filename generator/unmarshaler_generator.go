@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"strings"
+
 	. "github.com/dave/jennifer/jen"
 
 	"github.com/arisu-archive/bluearchive-fbs-generator/parser"
@@ -31,7 +33,9 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 		g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
 			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
 				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
-					Lit(def.Name),
+					Lit(
+						strings.ReplaceAll(strings.ReplaceAll(def.Name, "Excel", ""), "ExcelTable", ""),
+					),
 				),
 			),
 		)
