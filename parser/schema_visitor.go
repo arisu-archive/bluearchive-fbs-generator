@@ -1,6 +1,10 @@
 package parser
 
 import (
+	"context"
+	"fmt"
+	"path/filepath"
+
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
@@ -55,6 +59,33 @@ func (v *SchemaVisitor) GetSchema() *Schema {
 	return v.schema
 }
 
+// ResolveIncludes parses all included schema files and returns a map of type definitions
+func (v *SchemaVisitor) ResolveIncludes(ctx context.Context, basePath string) (map[string]SchemaType, error) {
+	typeMap := make(map[string]SchemaType)
+
+	// Process each include
+	for _, include := range v.schema.Includes {
+		includePath := filepath.Join(filepath.Dir(basePath), include)
+
+		// Parse the included schema file
+		includeSchema, err := ParseFile(ctx, includePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse included file %s: %w", include, err)
+		}
+
+		// Add all definitions from the included schema to our type map
+		for _, def := range includeSchema.Definitions {
+			typeMap[def.Name] = def.Type
+			// If namespace is present, also add with fully qualified name
+			if includeSchema.Namespace != "" {
+				typeMap[includeSchema.Namespace+"."+def.Name] = def.Type
+			}
+		}
+	}
+
+	return typeMap, nil
+}
+
 func (v *SchemaVisitor) buildSchema(fileName string) {
 	// Copy info
 	v.schema.FileName = fileName
@@ -65,33 +96,33 @@ func (v *SchemaVisitor) buildSchema(fileName string) {
 	v.schema.Definitions = v.definitionVisitor.Definitions
 
 	// Post-process field types to set IsStruct, IsEnum, etc.
-	v.processFieldTypes()
-}
-
-// processFieldTypes sets flags on fields based on definition types
-func (v *SchemaVisitor) processFieldTypes() {
-	// Build a type map for lookups
 	typeMap := make(map[string]SchemaType)
 	for _, def := range v.schema.Definitions {
 		typeMap[def.Name] = def.Type
 	}
+	v.processFieldTypes(typeMap)
+}
 
+// processFieldTypes processes field types using definitions from included schemas
+func (v *SchemaVisitor) processFieldTypes(typeMap map[string]SchemaType) {
 	// Process fields in all definitions
 	for i := range v.schema.Definitions {
 		def := &v.schema.Definitions[i]
 		for j := range def.Fields {
 			field := &def.Fields[j]
 
-			// Skip fields that already have type flags set
-			if field.IsString || field.IsVector || field.IsUnion {
+			// Skip fields that already have type flags set correctly
+			if field.IsStruct || field.IsEnum || field.IsUnion || field.IsTable {
 				continue
 			}
 
-			// Check if type exists in our definitions
+			// Check if the type exists in included schemas
 			if schemaType, exists := typeMap[field.Type]; exists {
 				switch schemaType {
 				case TypeStruct:
 					field.IsStruct = true
+				case TypeTable:
+					field.IsTable = true
 				case TypeEnum:
 					field.IsEnum = true
 				case TypeUnion:

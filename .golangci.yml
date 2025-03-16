@@ -238,6 +238,9 @@ linters-settings:
         disabled: true # Already checked by gocognit.
       - name: flag-parameter
         disabled: true # We use boolean parameters.
+      - name: dot-imports
+        arguments:
+          - "^github.com/dave/jennifer/jen$"
 
   misspell:
     locale: "US"

@@ -18,8 +18,17 @@ type Field struct {
 	IsVector bool
 	IsString bool
 	IsStruct bool
+	IsTable  bool
 	IsEnum   bool
 	IsUnion  bool
+}
+
+func (f Field) IsNested() bool {
+	return (f.IsTable || f.IsStruct || f.IsUnion)
+}
+
+func (f Field) IsNestedVector() bool {
+	return f.IsNested() && f.IsVector
 }
 
 func (f Field) IsPrimitive() bool {

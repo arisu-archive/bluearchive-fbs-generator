@@ -34,5 +34,13 @@ func ParseFile(ctx context.Context, path string) (*Schema, error) {
 		return nil, fmt.Errorf("failed to visit root node: %w", err)
 	}
 
+	includedTypes, err := visitor.ResolveIncludes(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve includes: %w", err)
+	}
+
+	// Process field types again with included types
+	visitor.processFieldTypes(includedTypes)
+
 	return visitor.GetSchema(), nil
 }
