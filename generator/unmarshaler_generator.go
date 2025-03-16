@@ -10,31 +10,6 @@ import (
 // Function Signature:
 // func (t *<modelName>) Unmarshal(data []byte) error
 func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) {
-	f.Comment("Unmarshal unmarshals the struct from a FlatBuffers buffer")
-	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("Unmarshal").Params(
-		Id("data").Index().Add(Byte()),
-	).Params(
-		Error(),
-	).BlockFunc(func(g *Group) {
-		// root := GetRootAs<modelName>(data, 0)
-		g.Id("root").Op(":=").Id("GetRootAs"+def.Name).Call(Id("data"), Lit(0))
-		// err := t.UnmarshalMessage(root)
-		g.Id("err").Op(":=").Id("t").Dot("UnmarshalMessage").Call(Id("root"))
-		// If err != nil, return err
-		g.If(Id("err").Op("!=").Nil()).Block(
-			Return(Id("err")),
-		)
-		// return nil
-		g.Return(Nil())
-	})
-
-	f.Line()
-}
-
-// generateUnmarshal is a helper function that generates code for the UnmarshalMessage method.
-// Function Signature:
-// func (t *<modelName>) UnmarshalMessage(e *<def.Name>) error
-func generateUnmarshal(f *File, def parser.Definition, modelName string) {
 	f.Comment("UnmarshalMessage unmarshals the struct from a FlatBuffers buffer")
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("UnmarshalMessage").Params(
 		Id("e").Op("*").Id(def.Name),
@@ -74,7 +49,11 @@ func generateUnmarshal(f *File, def parser.Definition, modelName string) {
 						return
 					}
 					// t.<fieldName>[i] = excelField[i]
-					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelField.Call(Id("i")))
+					excelFieldValue := excelField.Call(Id("i"))
+					if field.IsString {
+						excelFieldValue = Id("string").Call(excelFieldValue)
+					}
+					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelFieldValue)
 				})
 			} else if field.IsNested() {
 				// t.<fieldName> = excelField(st)
@@ -84,6 +63,31 @@ func generateUnmarshal(f *File, def parser.Definition, modelName string) {
 				handleFieldType(tableField, field, excelField.Call())
 			}
 		}
+		g.Return(Nil())
+	})
+
+	f.Line()
+}
+
+// generateUnmarshal is a helper function that generates code for the UnmarshalMessage method.
+// Function Signature:
+// func (t *<modelName>) UnmarshalMessage(e *<def.Name>) error
+func generateUnmarshal(f *File, def parser.Definition, modelName string) {
+	f.Comment("Unmarshal unmarshals the struct from a FlatBuffers buffer")
+	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("Unmarshal").Params(
+		Id("data").Index().Add(Byte()),
+	).Params(
+		Error(),
+	).BlockFunc(func(g *Group) {
+		// root := GetRootAs<modelName>(data, 0)
+		g.Id("root").Op(":=").Id("GetRootAs"+def.Name).Call(Id("data"), Lit(0))
+		// err := t.UnmarshalMessage(root)
+		g.Id("err").Op(":=").Id("t").Dot("UnmarshalMessage").Call(Id("root"))
+		// If err != nil, return err
+		g.If(Id("err").Op("!=").Nil()).Block(
+			Return(Id("err")),
+		)
+		// return nil
 		g.Return(Nil())
 	})
 
