@@ -35,7 +35,7 @@ func toCamel(name string) string {
 // toExportedName converts a field name to an exported Go identifier.
 func toExportedName(name string) string {
 	// It is camel but DO NOT make the character after number uppercase
-	return toCamel(strings.ReplaceAll(name, "Excel", ""))
+	return toCamel(name)
 }
 
 func toModelName(name string) string {
