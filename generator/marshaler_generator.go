@@ -21,6 +21,13 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("MarshalModel").Params(
 		Id("b").Op("*").Qual("github.com/google/flatbuffers/go", "Builder"),
 	).Qual("github.com/google/flatbuffers/go", "UOffsetT").BlockFunc(func(g *Group) {
+		g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
+			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
+				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
+					Lit(def.Name),
+				),
+			),
+		)
 		// <FlatBufferMessage>Start(b)
 		g.Id(def.Name + "Start").Call(Id("b"))
 		// Start adding codes to unmarshal the struct fields.

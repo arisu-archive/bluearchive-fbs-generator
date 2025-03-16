@@ -10,23 +10,31 @@ import (
 // Function Signature:
 // func (t *<modelName>) Unmarshal(data []byte) error
 func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) {
+	// Define helper function to handle type conversion
+	handleFieldType := func(tableField *Statement, field parser.Field, val Code) {
+		switch {
+		case field.IsEnum:
+			tableField.Op("=").Add(Id(field.Type).Call(Id("int32").Call(fieldConverter(val))))
+		case field.IsString:
+			tableField.Op("=").Add(fieldConverter(Id("string").Call(val)))
+		default:
+			tableField.Op("=").Add(fieldConverter(val))
+		}
+	}
+
 	f.Comment("UnmarshalMessage unmarshals the struct from a FlatBuffers buffer")
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("UnmarshalMessage").Params(
 		Id("e").Op("*").Id(def.Name),
 	).Params(
 		Error(),
 	).BlockFunc(func(g *Group) {
-		// Define helper function to handle type conversion
-		handleFieldType := func(tableField *Statement, field parser.Field, val Code) {
-			switch {
-			case field.IsEnum:
-				tableField.Op("=").Add(Id(field.Type).Call(Id("int32").Call(fieldConverter(val))))
-			case field.IsString:
-				tableField.Op("=").Add(fieldConverter(Id("string").Call(val)))
-			default:
-				tableField.Op("=").Add(fieldConverter(val))
-			}
-		}
+		g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
+			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
+				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
+					Lit(def.Name),
+				),
+			),
+		)
 
 		for _, field := range def.Fields {
 			tableField := g.Id("t").Dot(toExportedName(field.Name))
