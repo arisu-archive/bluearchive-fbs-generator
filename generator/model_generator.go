@@ -74,9 +74,9 @@ func generateStructType(f *File, def parser.Definition) {
 // generateStructName generates a method that returns the name of the struct.
 func generateStructName(f *File, def parser.Definition) {
 	modelName := toModelName(def.Name)
-	f.Comment("Name returns the name of the struct")
+	f.Comment("Name returns the name of the flatbuffer table name")
 	f.Func().Params(Id(modelName)).Id("FlatDataName").Params().String().BlockFunc(func(g *Group) {
-		g.Return(Lit(modelName))
+		g.Return(Lit(def.Name))
 	})
 	f.Line()
 }
