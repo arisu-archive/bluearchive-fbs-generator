@@ -19,6 +19,8 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 			tableField.Op("=").Add(Id(field.Type).Call(fieldConverter(Id("int32").Call(val))))
 		case field.IsString:
 			tableField.Op("=").Add(fieldConverter(Id("string").Call(val)))
+		case field.IsPrimitive() && field.Type == "bool":
+			tableField.Op("=").Add(val)
 		default:
 			tableField.Op("=").Add(fieldConverter(val))
 		}
@@ -66,7 +68,8 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 						excelFieldValue = Id("string").Call(excelFieldValue)
 					} else if field.IsEnum {
 						excelFieldValue = Id(field.Type).Call(fieldConverter(Id("int32").Call(excelFieldValue)))
-					} else if field.IsPrimitive() {
+					} else if field.IsPrimitive() && field.Type != "bool" {
+						// bool is a special case, it doesn't need to be converted
 						excelFieldValue = fieldConverter(excelFieldValue)
 					}
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelFieldValue)

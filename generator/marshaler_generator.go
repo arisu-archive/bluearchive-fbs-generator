@@ -53,15 +53,19 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
 
 					// b.Prepend<GoType>(fbsutils.Convert(t.FieldName[i], t.FlatBuffer.TableKey))
 					goType := strcase.ToCamel(getBaseGoType(field).GoString())
-					switch true {
+					switch {
 					case field.IsString:
 						goType = "UOffsetT"
 						indexedFieldAccessor = Id("b").Dot("CreateString").Call(indexedFieldAccessor)
 					case field.IsEnum:
 						goType = "Int32"
-						indexedFieldAccessor = Id("int32").Call(fieldConverter(indexedFieldAccessor))
+						indexedFieldAccessor = fieldConverter(Id("int32").Call(indexedFieldAccessor))
+					case field.IsPrimitive() && field.Type != "bool":
+						indexedFieldAccessor = fieldConverter(indexedFieldAccessor)
+					default:
+						goType = strcase.ToCamel(getBaseGoType(field).GoString())
 					}
-					g.Id("b").Dot("Prepend" + goType).Call(fieldConverter(indexedFieldAccessor))
+					g.Id("b").Dot("Prepend" + goType).Call(indexedFieldAccessor)
 				})
 				// <FlatBufferMessage>Add<FieldName>(b, b.EndVector(len(t.FieldName)))
 				fieldSetter(g, field, Id("b").Dot("EndVector").Call(Id("len").Call(fieldAccessor)))
@@ -70,10 +74,12 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
 				fieldSetter(g, field, fieldAccessor.Dot("MarshalModel").Call(Id("b")))
 			} else {
 				if field.IsString {
-					fieldAccessor = Id("b").Dot("CreateString").Call(fieldAccessor)
+					fieldAccessor = Id("b").Dot("CreateString").Call(fieldConverter(fieldAccessor))
+				} else if field.Type != "bool" {
+					fieldAccessor = fieldConverter(fieldAccessor)
 				}
 				// <FlatBufferMessage>Add<FieldName>(b, fbsutils.Convert(<FieldName>, t.FlatBuffer.TableKey))
-				fieldSetter(g, field, fieldConverter(fieldAccessor))
+				fieldSetter(g, field, fieldAccessor)
 			}
 		}
 		g.Return(Id(def.Name + "End").Call(Id("b")))
