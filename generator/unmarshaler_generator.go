@@ -65,7 +65,7 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 					// t.<fieldName>[i] = excelField[i]
 					excelFieldValue := excelField.Call(Id("i"))
 					if field.IsString {
-						excelFieldValue = Id("string").Call(excelFieldValue)
+						excelFieldValue = fieldConverter(Id("string").Call(excelFieldValue))
 					} else if field.IsEnum {
 						excelFieldValue = Id(field.Type).Call(fieldConverter(Id("int32").Call(excelFieldValue)))
 					} else if field.IsPrimitive() && field.Type != "bool" {
