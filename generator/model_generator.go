@@ -9,7 +9,7 @@ import (
 )
 
 // generateModel creates Go struct definitions that match FlatBuffers schema.
-func generateModel(s *parser.Schema, pkgName, outputDir string) error {
+func generateModel(s *parser.Schema, pkgName, outputDir string, withoutDecryption bool) error {
 	f := NewFile(pkgName)
 
 	// Add package documentation
@@ -22,8 +22,8 @@ func generateModel(s *parser.Schema, pkgName, outputDir string) error {
 		switch def.Type {
 		case parser.TypeStruct, parser.TypeTable:
 			generateStructType(f, def)
-			generateStructMarshaler(f, def)
-			generateStructUnmarshaler(f, def)
+			generateStructMarshaler(f, def, withoutDecryption)
+			generateStructUnmarshaler(f, def, withoutDecryption)
 			generateStructName(f, def)
 			written = true
 		case parser.TypeUnion:

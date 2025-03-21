@@ -13,10 +13,12 @@ import (
 
 func main() {
 	var inputPath, outputDir, packageName string
+	var withoutDecryption bool
 
 	flag.StringVar(&inputPath, "i", "", "Input directory containing .fbs files (required)")
 	flag.StringVar(&outputDir, "o", ".", "Output directory for generated Go files")
 	flag.StringVar(&packageName, "p", "model", "Package name for generated Go files")
+	flag.BoolVar(&withoutDecryption, "without-decryption", false, "Generate decryption functions")
 	flag.Parse()
 
 	if inputPath == "" {
@@ -48,7 +50,7 @@ func main() {
 		}
 
 		// Generate code
-		if genErr := generator.Generate(schema, packageName, outputDir); genErr != nil {
+		if genErr := generator.Generate(schema, packageName, outputDir, withoutDecryption); genErr != nil {
 			fmt.Printf("Error generating code: %v\n", genErr)
 			os.Exit(1)
 		}

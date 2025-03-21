@@ -11,7 +11,7 @@ import (
 // generateUnmarshalMessage is a helper function that generates code for the UnmarshalMessage method.
 // Function Signature:
 // func (t *<modelName>) Unmarshal(data []byte) error
-func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) {
+func generateUnmarshalMessage(f *File, def parser.Definition, modelName string, withoutDecryption bool) {
 	// Define helper function to handle type conversion
 	handleFieldType := func(tableField *Statement, field parser.Field, val Code) {
 		switch {
@@ -32,15 +32,17 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string) 
 	).Params(
 		Error(),
 	).BlockFunc(func(g *Group) {
-		g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
-			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
-				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
-					Lit(
-						strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
+		if !withoutDecryption {
+			g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
+				Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
+					Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
+						Lit(
+							strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
+						),
 					),
 				),
-			),
-		)
+			)
+		}
 
 		for _, field := range def.Fields {
 			tableField := g.Id("t").Dot(toExportedName(field.Name))
@@ -114,8 +116,8 @@ func generateUnmarshal(f *File, def parser.Definition, modelName string) {
 }
 
 // generateStructUnmarshaler generates a Go unmarshaler for a FlatBuffers struct.
-func generateStructUnmarshaler(f *File, def parser.Definition) {
+func generateStructUnmarshaler(f *File, def parser.Definition, withoutDecryption bool) {
 	modelName := toModelName(def.Name)
-	generateUnmarshalMessage(f, def, modelName)
+	generateUnmarshalMessage(f, def, modelName, withoutDecryption)
 	generateUnmarshal(f, def, modelName)
 }

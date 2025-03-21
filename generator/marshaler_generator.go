@@ -13,7 +13,7 @@ import (
 // generateMarshalMessage is a helper function that generates code for the MarshalMessage method.
 // Function Signature:
 // func (t *<modelName>) Marshal(b *flatbuffers.Builder) flatbuffers.UOffsetT
-func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
+func generateMarshalMessage(f *File, def parser.Definition, modelName string, withoutDecryption bool) {
 	fieldSetter := func(g *Group, field parser.Field, fieldAccessor Code) {
 		// <FlatBufferMessage>Add<FieldName>(b, <fieldAccessor>)
 		g.Id(def.Name+"Add"+toExportedName(field.Name)).Call(Id("b"), fieldAccessor)
@@ -23,15 +23,18 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string) {
 	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("MarshalModel").Params(
 		Id("b").Op("*").Qual("github.com/google/flatbuffers/go", "Builder"),
 	).Qual("github.com/google/flatbuffers/go", "UOffsetT").BlockFunc(func(g *Group) {
-		g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
-			Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
-				Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
-					Lit(
-						strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
+		// Skip the initialization of the table key if withoutDecryption is true.
+		if !withoutDecryption {
+			g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
+				Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
+					Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
+						Lit(
+							strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
+						),
 					),
 				),
-			),
-		)
+			)
+		}
 		// <FlatBufferMessage>Start(b)
 		g.Id(def.Name + "Start").Call(Id("b"))
 		// Start adding codes to unmarshal the struct fields.
@@ -111,8 +114,8 @@ func generateMarshal(f *File, def parser.Definition, modelName string) {
 }
 
 // generateStructMarshaler creates a Go marshaler for a FlatBuffers struct.
-func generateStructMarshaler(f *File, def parser.Definition) {
+func generateStructMarshaler(f *File, def parser.Definition, withoutDecryption bool) {
 	modelName := toModelName(def.Name)
-	generateMarshalMessage(f, def, modelName)
+	generateMarshalMessage(f, def, modelName, withoutDecryption)
 	generateMarshal(f, def, modelName)
 }
