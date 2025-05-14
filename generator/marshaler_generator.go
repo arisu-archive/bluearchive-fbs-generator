@@ -101,8 +101,7 @@ func generateMarshal(f *File, def parser.Definition, modelName string) {
 		Error(),
 	).BlockFunc(func(g *Group) {
 		g.Id("b").Op(":=").Qual("github.com/google/flatbuffers/go", "NewBuilder").Call(Lit(0))
-		g.Id("Finish"+def.Name+"Buffer").Call(
-			Id("b"),
+		g.Id("b").Dot("Finish").Call(
 			Id("t").Dot("MarshalModel").Call(Id("b")),
 		)
 		g.Return(
