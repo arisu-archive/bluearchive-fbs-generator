@@ -50,6 +50,9 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string, wi
 					if field.IsNested() {
 						// b.PrependUOffsetT(t.FieldName[i].MarshalModel(b))
 						g.Comment("The array should be reversed.")
+						if !withoutDecryption {
+							indexedFieldAccessor.Dot("FlatBuffer").Dot("InitKey").Call(Id("t").Dot("FlatBuffer").Dot("TableKey"))
+						}
 						g.Id("b").Dot("PrependUOffsetT").Call(indexedFieldAccessor.Dot("MarshalModel").Call(Id("b")))
 						return
 					}
@@ -74,6 +77,10 @@ func generateMarshalMessage(f *File, def parser.Definition, modelName string, wi
 				fieldSetter(g, field, Id("b").Dot("EndVector").Call(Id("len").Call(fieldAccessor)))
 			} else if field.IsNested() {
 				// <FlatBufferMessage>Add<FieldName>(b, <fieldAccessor>.MarshalModel(b))
+				// Call InitKey with current table key if the field is a nested struct.
+				if !withoutDecryption {
+					fieldAccessor.Dot("FlatBuffer").Dot("InitKey").Call(Id("t").Dot("FlatBuffer").Dot("TableKey"))
+				}
 				fieldSetter(g, field, fieldAccessor.Dot("MarshalModel").Call(Id("b")))
 			} else {
 				if field.IsString {
