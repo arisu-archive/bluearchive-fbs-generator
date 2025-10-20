@@ -1,5 +1,7 @@
 github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20250315033114-3042d1078f01 h1:UEA/J6oD6+YUomRLLMTekzhgEQQJhBKeKNIWYikPtNk=
 github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20250315033114-3042d1078f01/go.mod h1:5vVFzUqVNb2XeifTVzpQcHNsJ2V2qqKF1XgWl8giPX0=
+github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20251019215142-970268a6e126 h1:CBI3mlPtUa29n8+Rwl0zlv7/BROxsIjHFVRwrmkHHHg=
+github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20251019215142-970268a6e126/go.mod h1:5vVFzUqVNb2XeifTVzpQcHNsJ2V2qqKF1XgWl8giPX0=
 github.com/dave/jennifer v1.7.1 h1:B4jJJDHelWcDhlRQxWeo0Npa/pYKBLrirAQoTN45txo=
 github.com/dave/jennifer v1.7.1/go.mod h1:nXbxhEmQfOZhWml3D1cDK5M1FLnMSozpbFN/m3RmGZc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
