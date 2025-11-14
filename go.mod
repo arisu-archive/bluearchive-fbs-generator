@@ -2,7 +2,7 @@ module github.com/arisu-archive/bluearchive-fbs-generator
 
 go 1.23.0
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require (
 	github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20251019215142-970268a6e126
