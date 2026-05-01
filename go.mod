@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.26.2
 
 require (
-	github.com/arisu-archive/tree-sitter-flatbuffers v0.0.0-20251019215142-970268a6e126
+	github.com/arisu-archive/tree-sitter-flatbuffers 705cedb4796c
 	github.com/dave/jennifer v1.7.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
