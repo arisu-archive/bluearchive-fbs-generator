@@ -1,136 +1,156 @@
 package generator
 
 import (
-	"strings"
-
-	. "github.com/dave/jennifer/jen"
+	"github.com/dave/jennifer/jen"
 
 	"github.com/arisu-archive/bluearchive-fbs-generator/parser"
 )
 
-// generateUnmarshalMessage is a helper function that generates code for the UnmarshalMessage method.
-// Function Signature:
-// func (t *<modelName>) Unmarshal(data []byte) error
-func generateUnmarshalMessage(f *File, def parser.Definition, modelName string, withoutDecryption bool) {
-	// Define helper function to handle type conversion
-	handleFieldType := func(tableField *Statement, field parser.Field, val Code) {
+func generateUnmarshalMessage(file *jen.File, definition parser.Definition, modelName string, withoutDecryption bool) {
+	handleFieldType := func(tableField *jen.Statement, field parser.Field, value jen.Code) {
+		if withoutDecryption {
+			if field.IsString {
+				tableField.Op("=").Add(jen.String().Call(value))
+				return
+			}
+			tableField.Op("=").Add(value)
+			return
+		}
 		switch {
 		case field.IsEnum:
-			tableField.Op("=").Add(Id(field.Type).Call(fieldConverter(Id("int32").Call(val))))
+			tableField.Op("=").Add(jen.Id(field.Type).Call(fieldConverter(jen.Int32().Call(value))))
 		case field.IsString:
-			tableField.Op("=").Add(fieldConverter(Id("string").Call(val)))
+			tableField.Op("=").Add(fieldConverter(jen.String().Call(value)))
 		case field.IsPrimitive() && field.Type == "bool":
-			tableField.Op("=").Add(val)
+			tableField.Op("=").Add(value)
 		default:
-			tableField.Op("=").Add(fieldConverter(val))
+			tableField.Op("=").Add(fieldConverter(value))
 		}
 	}
 
-	f.Comment("UnmarshalMessage unmarshals the struct from a FlatBuffers buffer")
-	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("UnmarshalMessage").Params(
-		Id("e").Op("*").Id(def.Name),
-	).Params(
-		Error(),
-	).BlockFunc(func(g *Group) {
+	file.Comment("UnmarshalMessage unmarshals the struct from a FlatBuffers table.")
+	file.Func().Params(jen.Id("t").Op("*").Id(modelName)).Id("UnmarshalMessage").Params(
+		jen.Id("e").Op("*").Id(definition.Name),
+	).Error().BlockFunc(func(group *jen.Group) {
 		if !withoutDecryption {
-			g.If(Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
-				Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
-					Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
-						Lit(
-							strings.ReplaceAll(strings.ReplaceAll(def.Name, "ExcelTable", ""), "Excel", ""),
-						),
+			group.If(jen.Id("t").Dot("FlatBuffer").Dot("TableKey").Op("==").Nil()).Block(
+				jen.Id("t").Dot("FlatBuffer").Dot("InitKey").Call(
+					jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "CreateTableKey").Call(
+						jen.Lit(tableKeyName(definition.Name)),
 					),
 				),
 			)
 		}
 
-		for _, field := range def.Fields {
-			excelField := Id("e").Dot(toExportedName(field.Name))
+		for _, field := range definition.Fields {
+			flatBufferField := jen.Id("e").Dot(toFlatBuffersName(field.Name))
+			localName := toLocalName(field.Name)
 			if field.IsVector {
-				tableField := g.Id("t").Dot(toExportedName(field.Name))
-				excelFieldLength := Id("e").Dot(toExportedName(field.Name) + "Length").Call()
-				// t.<fieldName> := make([]<fieldType>, excelFieldLength)
-				tableField.Op("=").Make(getGoType(field), excelFieldLength)
-				// for i := range excelFieldLength
-				g.For(Id("i").Op(":=").Range().Add(excelFieldLength)).BlockFunc(func(g *Group) {
+				tableField := group.Id("t").Dot(toExportedName(field.Name))
+				fieldLength := jen.Id("e").Dot(toFlatBuffersName(field.Name) + "Length").Call()
+				tableField.Op("=").Make(getGoType(field), fieldLength)
+				group.For(
+					jen.Id("i").Op(":=").Lit(0),
+					jen.Id("i").Op("<").Add(fieldLength),
+					jen.Id("i").Op("++"),
+				).BlockFunc(func(group *jen.Group) {
 					if field.IsNestedVector() {
-						// d := new(<fieldType>)
-						g.Id("d").Op(":=").New(Id(field.Type))
-						// if !e.<fieldName>(d, i) {
-						g.If(Op("!").Add(excelField).Call(Id("d"), Id("i"))).Block(
-							Return(Qual("errors", "New").Call(Lit("failed to unmarshal data"))),
-						)
-						if !withoutDecryption {
-							// t.<fieldName>[i].InitKey(t.FlatBuffer.TableKey)
-							g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Dot("InitKey").Call(
-								Id("t").Dot("FlatBuffer").Dot("TableKey"),
-							)
-						}
-						// t.<fieldName>[i].UnmarshalMessage(d)
-						g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Dot("UnmarshalMessage").Call(Id("d"))
+						generateNestedVectorUnmarshal(group, field, flatBufferField, withoutDecryption)
 						return
 					}
-					// t.<fieldName>[i] = excelField[i]
-					excelFieldValue := excelField.Call(Id("i"))
-					if field.IsString {
-						excelFieldValue = fieldConverter(Id("string").Call(excelFieldValue))
-					} else if field.IsEnum {
-						excelFieldValue = Id(field.Type).Call(fieldConverter(Id("int32").Call(excelFieldValue)))
-					} else if field.IsPrimitive() && field.Type != "bool" {
-						// bool is a special case, it doesn't need to be converted
-						excelFieldValue = fieldConverter(excelFieldValue)
+
+					fieldValue := flatBufferField.Call(jen.Id("i"))
+					switch {
+					case field.IsString:
+						fieldValue = jen.String().Call(fieldValue)
+						if !withoutDecryption {
+							fieldValue = fieldConverter(fieldValue)
+						}
+					case field.IsEnum:
+						if !withoutDecryption {
+							fieldValue = jen.Id(field.Type).Call(fieldConverter(jen.Int32().Call(fieldValue)))
+						}
+					case !withoutDecryption && field.IsPrimitive() && field.Type != "bool":
+						fieldValue = fieldConverter(fieldValue)
 					}
-					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelFieldValue)
+					group.Id("t").Dot(toExportedName(field.Name)).Index(jen.Id("i")).Op("=").Add(fieldValue)
 				})
-			} else if field.IsNested() {
-				if !withoutDecryption {
-					// t.<fieldName>.InitKey(t.FlatBuffer.TableKey)
-					g.Id("t").Dot(toExportedName(field.Name)).Dot("InitKey").Call(
-						Id("t").Dot("FlatBuffer").Dot("TableKey"),
-					)
-				}
-				// t.<fieldName>.UnmarshalMessage(excelField(nil))
-				g.Id("t").Dot(toExportedName(field.Name)).Dot("UnmarshalMessage").Call(excelField.Call(Nil()))
-			} else {
-				tableField := g.Id("t").Dot(toExportedName(field.Name))
-				// t.<fieldName> = excelField()
-				handleFieldType(tableField, field, excelField.Call())
+				continue
 			}
+
+			if field.IsNested() {
+				group.Id("t").Dot(toExportedName(field.Name)).Op("=").Add(getBaseGoType(field).Values())
+				group.Id(localName).Op(":=").Add(flatBufferField.Call(jen.Nil()))
+				group.If(jen.Id(localName).Op("!=").Nil()).BlockFunc(func(group *jen.Group) {
+					if !withoutDecryption {
+						group.Id("t").Dot(toExportedName(field.Name)).Dot("InitKey").Call(
+							jen.Id("t").Dot("FlatBuffer").Dot("TableKey"),
+						)
+					}
+					group.If(
+						jen.Err().Op(":=").Id("t").Dot(toExportedName(field.Name)).Dot("UnmarshalMessage").Call(jen.Id(localName)),
+						jen.Err().Op("!=").Nil(),
+					).Block(
+						jen.Return(jen.Qual("fmt", "Errorf").Call(
+							jen.Lit("unmarshal "+field.Name+": %w"),
+							jen.Err(),
+						)),
+					)
+				})
+				continue
+			}
+
+			tableField := group.Id("t").Dot(toExportedName(field.Name))
+			handleFieldType(tableField, field, flatBufferField.Call())
 		}
-		g.Return(Nil())
+		group.Return(jen.Nil())
 	})
-
-	f.Line()
+	file.Line()
 }
 
-// generateUnmarshal is a helper function that generates code for the UnmarshalMessage method.
-// Function Signature:
-// func (t *<modelName>) UnmarshalMessage(e *<def.Name>) error
-func generateUnmarshal(f *File, def parser.Definition, modelName string) {
-	f.Comment("Unmarshal unmarshals the struct from a FlatBuffers buffer")
-	f.Func().Params(Id("t").Op("*").Id(modelName)).Id("Unmarshal").Params(
-		Id("data").Index().Add(Byte()),
-	).Params(
-		Error(),
-	).BlockFunc(func(g *Group) {
-		// root := GetRootAs<modelName>(data, 0)
-		g.Id("root").Op(":=").Id("GetRootAs"+def.Name).Call(Id("data"), Lit(0))
-		// err := t.UnmarshalMessage(root)
-		g.Id("err").Op(":=").Id("t").Dot("UnmarshalMessage").Call(Id("root"))
-		// If err != nil, return err
-		g.If(Id("err").Op("!=").Nil()).Block(
-			Return(Id("err")),
+func generateNestedVectorUnmarshal(
+	group *jen.Group,
+	field parser.Field,
+	flatBufferField *jen.Statement,
+	withoutDecryption bool,
+) {
+	group.Id("child").Op(":=").New(jen.Id(field.Type))
+	group.If(jen.Op("!").Add(flatBufferField).Call(jen.Id("child"), jen.Id("i"))).Block(
+		jen.Return(jen.Qual("fmt", "Errorf").Call(
+			jen.Lit("read "+field.Name+"[%d]"),
+			jen.Id("i"),
+		)),
+	)
+	if !withoutDecryption {
+		group.Id("t").Dot(toExportedName(field.Name)).Index(jen.Id("i")).Dot("InitKey").Call(
+			jen.Id("t").Dot("FlatBuffer").Dot("TableKey"),
 		)
-		// return nil
-		g.Return(Nil())
-	})
-
-	f.Line()
+	}
+	group.If(
+		jen.Err().Op(":=").Id("t").Dot(toExportedName(field.Name)).Index(jen.Id("i")).Dot("UnmarshalMessage").Call(jen.Id("child")),
+		jen.Err().Op("!=").Nil(),
+	).Block(
+		jen.Return(jen.Qual("fmt", "Errorf").Call(
+			jen.Lit("unmarshal "+field.Name+"[%d]: %w"),
+			jen.Id("i"),
+			jen.Err(),
+		)),
+	)
 }
 
-// generateStructUnmarshaler generates a Go unmarshaler for a FlatBuffers struct.
-func generateStructUnmarshaler(f *File, def parser.Definition, withoutDecryption bool) {
-	modelName := toModelName(def.Name)
-	generateUnmarshalMessage(f, def, modelName, withoutDecryption)
-	generateUnmarshal(f, def, modelName)
+func generateUnmarshal(file *jen.File, definition parser.Definition, modelName string) {
+	file.Comment("Unmarshal unmarshals the struct from a FlatBuffers buffer.")
+	file.Func().Params(jen.Id("t").Op("*").Id(modelName)).Id("Unmarshal").Params(
+		jen.Id("data").Index().Byte(),
+	).Error().Block(
+		jen.Id("root").Op(":=").Id("GetRootAs"+definition.Name).Call(jen.Id("data"), jen.Lit(0)),
+		jen.Return(jen.Id("t").Dot("UnmarshalMessage").Call(jen.Id("root"))),
+	)
+	file.Line()
+}
+
+func generateTableUnmarshaler(file *jen.File, definition parser.Definition, withoutDecryption bool) {
+	modelName := toModelName(definition.Name)
+	generateUnmarshalMessage(file, definition, modelName, withoutDecryption)
+	generateUnmarshal(file, definition, modelName)
 }

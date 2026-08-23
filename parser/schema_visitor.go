@@ -8,14 +8,14 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// SchemaVisitor combines multiple visitors
+// SchemaVisitor combines schema metadata and definition visitors.
 type SchemaVisitor struct {
 	infoVisitor       *InfoVisitor
 	definitionVisitor *DefinitionVisitor
 	schema            *Schema
 }
 
-// NewSchemaVisitor creates a new SchemaVisitor
+// NewSchemaVisitor creates a SchemaVisitor.
 func NewSchemaVisitor() *SchemaVisitor {
 	return &SchemaVisitor{
 		infoVisitor:       NewInfoVisitor(),
@@ -24,7 +24,7 @@ func NewSchemaVisitor() *SchemaVisitor {
 	}
 }
 
-// Visit dispatches the node to the appropriate specialized visitor
+// Visit dispatches a syntax node to the specialized visitors.
 func (v *SchemaVisitor) Visit(node *sitter.Node, fileName string, content []byte) error {
 	// Only process source_file at the top level
 	if node.Kind() != "source_file" {
@@ -40,10 +40,14 @@ func (v *SchemaVisitor) Visit(node *sitter.Node, fileName string, content []byte
 			declaration := child.Child(0)
 			if declaration != nil {
 				// Process info-related declarations
-				v.infoVisitor.Visit(declaration, content)
+				if err := v.infoVisitor.Visit(declaration, content); err != nil {
+					return fmt.Errorf("visit schema information: %w", err)
+				}
 
 				// Process definition-related declarations
-				v.definitionVisitor.Visit(declaration, content)
+				if err := v.definitionVisitor.Visit(declaration, content); err != nil {
+					return fmt.Errorf("visit schema definition: %w", err)
+				}
 			}
 		}
 	}
@@ -54,13 +58,27 @@ func (v *SchemaVisitor) Visit(node *sitter.Node, fileName string, content []byte
 	return nil
 }
 
-// GetSchema returns the built schema
+// GetSchema returns the built schema.
 func (v *SchemaVisitor) GetSchema() *Schema {
 	return v.schema
 }
 
-// ResolveIncludes parses all included schema files and returns a map of type definitions
+// ResolveIncludes parses included schemas and returns their type definitions.
 func (v *SchemaVisitor) ResolveIncludes(ctx context.Context, basePath string) (map[string]SchemaType, error) {
+	canonicalPath, err := filepath.Abs(basePath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve schema path %q: %w", basePath, err)
+	}
+	canonicalPath = filepath.Clean(canonicalPath)
+	visiting := map[string]struct{}{canonicalPath: {}}
+	return v.resolveIncludes(ctx, canonicalPath, visiting)
+}
+
+func (v *SchemaVisitor) resolveIncludes(
+	ctx context.Context,
+	basePath string,
+	visiting map[string]struct{},
+) (map[string]SchemaType, error) {
 	typeMap := make(map[string]SchemaType)
 
 	// Process each include
@@ -68,7 +86,7 @@ func (v *SchemaVisitor) ResolveIncludes(ctx context.Context, basePath string) (m
 		includePath := filepath.Join(filepath.Dir(basePath), include)
 
 		// Parse the included schema file
-		includeSchema, err := ParseFile(ctx, includePath)
+		includeSchema, err := parseFile(ctx, includePath, visiting)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse included file %s: %w", include, err)
 		}

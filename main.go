@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -12,51 +14,68 @@ import (
 )
 
 func main() {
-	var inputPath, outputDir, packageName string
-	var withoutDecryption bool
+	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
-	flag.StringVar(&inputPath, "i", "", "Input directory containing .fbs files (required)")
-	flag.StringVar(&outputDir, "o", ".", "Output directory for generated Go files")
-	flag.StringVar(&packageName, "p", "model", "Package name for generated Go files")
-	flag.BoolVar(&withoutDecryption, "without-decryption", false, "Generate decryption functions")
-	flag.Parse()
+func run(ctx context.Context, arguments []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("fbsgen", flag.ContinueOnError)
+	flags.SetOutput(stderr)
 
+	var (
+		inputPath         string
+		outputDir         string
+		packageName       string
+		withoutDecryption bool
+	)
+	flags.StringVar(&inputPath, "i", "", "Input directory containing .fbs files (required)")
+	flags.StringVar(&inputPath, "input", "", "Input directory containing .fbs files (required)")
+	flags.StringVar(&outputDir, "o", ".", "Output directory for generated Go files")
+	flags.StringVar(&outputDir, "output", ".", "Output directory for generated Go files")
+	flags.StringVar(&packageName, "p", "model", "Package name for generated Go files")
+	flags.StringVar(&packageName, "package", "model", "Package name for generated Go files")
+	flags.BoolVar(
+		&withoutDecryption,
+		"without-decryption",
+		false,
+		"Skip field encryption and decryption conversions",
+	)
+
+	if err := flags.Parse(arguments); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return fmt.Errorf("parse flags: %w", err)
+	}
 	if inputPath == "" {
-		fmt.Println("Error: Input file is required")
-		flag.Usage()
-		os.Exit(1)
+		return errors.New("input directory is required")
 	}
 
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Glob all the files in the input directory
 	files, err := filepath.Glob(filepath.Join(inputPath, "*.fbs"))
 	if err != nil {
-		fmt.Printf("Error globbing files: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("find schemas in %q: %w", inputPath, err)
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no .fbs files found in %q", inputPath)
 	}
 
-	// Parse the schema
-	ctx := context.Background()
 	for _, file := range files {
 		schema, err := parser.ParseFile(ctx, file)
 		if err != nil {
-			fmt.Printf("Error parsing schema: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("parse schema %q: %w", file, err)
 		}
-
-		// Generate code
-		if genErr := generator.Generate(schema, packageName, outputDir, withoutDecryption); genErr != nil {
-			fmt.Printf("Error generating code: %v\n", genErr)
-			os.Exit(1)
+		if err := generator.Generate(schema, packageName, outputDir, withoutDecryption); err != nil {
+			return fmt.Errorf("generate schema %q: %w", file, err)
 		}
-
-		fmt.Printf("Generated code for %s\n", schema.FileName)
+		if _, err := fmt.Fprintf(stdout, "Generated code for %s\n", schema.FileName); err != nil {
+			return fmt.Errorf("write generation result: %w", err)
+		}
 	}
 
-	fmt.Println("Code generation completed successfully")
+	if _, err := fmt.Fprintln(stdout, "Code generation completed successfully"); err != nil {
+		return fmt.Errorf("write completion result: %w", err)
+	}
+	return nil
 }

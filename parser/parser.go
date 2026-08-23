@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,35 +12,70 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// ParseFile parses a FlatBuffers schema file and returns a Schema
+var (
+	// ErrInvalidSchema indicates that a FlatBuffers schema could not be parsed.
+	ErrInvalidSchema = errors.New("parser: invalid FlatBuffers schema")
+	// ErrIncludeCycle indicates that schema includes form a cycle.
+	ErrIncludeCycle = errors.New("parser: include cycle")
+)
+
+// ParseFile parses a FlatBuffers schema and its local includes. It returns
+// ErrInvalidSchema for malformed syntax and ErrIncludeCycle for include cycles.
 func ParseFile(ctx context.Context, path string) (*Schema, error) {
-	fileName := strings.TrimSuffix(filepath.Base(path), ".fbs")
-	content, err := os.ReadFile(path)
+	return parseFile(ctx, path, make(map[string]struct{}))
+}
+
+func parseFile(ctx context.Context, path string, visiting map[string]struct{}) (*Schema, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	canonicalPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
+		return nil, fmt.Errorf("resolve schema path %q: %w", path, err)
+	}
+	canonicalPath = filepath.Clean(canonicalPath)
+	if _, exists := visiting[canonicalPath]; exists {
+		return nil, fmt.Errorf("%w at %q", ErrIncludeCycle, canonicalPath)
+	}
+	visiting[canonicalPath] = struct{}{}
+	defer delete(visiting, canonicalPath)
+
+	fileName := strings.TrimSuffix(filepath.Base(canonicalPath), ".fbs")
+	content, err := os.ReadFile(canonicalPath)
+	if err != nil {
+		return nil, fmt.Errorf("read schema %q: %w", canonicalPath, err)
 	}
 
-	parser := sitter.NewParser()
-	if setErr := parser.SetLanguage(sitter.NewLanguage(flatbuffers.Language())); setErr != nil {
-		return nil, fmt.Errorf("failed to set language: %w", setErr)
+	syntaxParser := sitter.NewParser()
+	defer syntaxParser.Close()
+	if err := syntaxParser.SetLanguage(sitter.NewLanguage(flatbuffers.Language())); err != nil {
+		return nil, fmt.Errorf("set FlatBuffers language: %w", err)
 	}
 
-	tree := parser.ParseCtx(ctx, content, nil)
+	tree := syntaxParser.ParseCtx(ctx, content, nil)
+	if tree == nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%w: parser returned no syntax tree for %q", ErrInvalidSchema, canonicalPath)
+	}
+	defer tree.Close()
+
 	rootNode := tree.RootNode()
+	if rootNode.HasError() {
+		return nil, fmt.Errorf("%w: syntax error in %q", ErrInvalidSchema, canonicalPath)
+	}
 
-	// Create a visitor to build the schema
 	visitor := NewSchemaVisitor()
-	// Process each top-level node
 	if err := visitor.Visit(rootNode, fileName, content); err != nil {
-		return nil, fmt.Errorf("failed to visit root node: %w", err)
+		return nil, fmt.Errorf("visit schema %q: %w", canonicalPath, err)
 	}
 
-	includedTypes, err := visitor.ResolveIncludes(ctx, path)
+	includedTypes, err := visitor.resolveIncludes(ctx, canonicalPath, visiting)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve includes: %w", err)
+		return nil, fmt.Errorf("resolve includes for %q: %w", canonicalPath, err)
 	}
 
-	// Process field types again with included types
 	visitor.processFieldTypes(includedTypes)
 
 	return visitor.GetSchema(), nil

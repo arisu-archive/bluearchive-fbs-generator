@@ -4,7 +4,8 @@ import (
 	"strings"
 	"unicode"
 
-	. "github.com/dave/jennifer/jen"
+	"github.com/dave/jennifer/jen"
+	"github.com/iancoleman/strcase"
 
 	"github.com/arisu-archive/bluearchive-fbs-generator/parser"
 )
@@ -14,9 +15,27 @@ func toCamel(name string) string {
 		return ""
 	}
 
+	words := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '_' || r == ' ' || r == '-'
+	})
+	var result strings.Builder
+	for _, word := range words {
+		upperWord := strings.ToUpper(word)
+		if isInitialism(upperWord) {
+			result.WriteString(upperWord)
+			continue
+		}
+
+		runes := []rune(word)
+		result.WriteRune(unicode.ToUpper(runes[0]))
+		result.WriteString(string(runes[1:]))
+	}
+	return result.String()
+}
+
+func toFlatBuffersName(name string) string {
 	var result strings.Builder
 	upperNext := true
-
 	for _, r := range name {
 		switch {
 		case r == '_' || r == ' ' || r == '-':
@@ -28,89 +47,82 @@ func toCamel(name string) string {
 			result.WriteRune(r)
 		}
 	}
-
 	return result.String()
 }
 
-// toExportedName converts a field name to an exported Go identifier.
+func isInitialism(word string) bool {
+	switch word {
+	case "ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS":
+		return true
+	default:
+		return false
+	}
+}
+
 func toExportedName(name string) string {
-	// It is camel but DO NOT make the character after number uppercase
 	return toCamel(name)
+}
+
+func toLocalName(name string) string {
+	exportedName := toExportedName(name)
+	if exportedName == "" {
+		return ""
+	}
+	runes := []rune(exportedName)
+	runes[0] = unicode.ToLower(runes[0])
+	return string(runes)
 }
 
 func toModelName(name string) string {
 	return toExportedName(name) + "Dto"
 }
 
-// getDefTypeStr returns a string representation of the definition type.
-func getDefTypeStr(defType parser.SchemaType) string {
-	switch defType {
-	case parser.TypeStruct:
-		return "struct"
-	case parser.TypeTable:
-		return "table"
-	case parser.TypeEnum:
-		return "enum"
-	case parser.TypeUnion:
-		return "union"
-	default:
-		return "unknown"
-	}
+func toFileName(name string) string {
+	return strcase.ToSnake(toModelName(name)) + ".go"
 }
 
-// getGoType converts a FlatBuffers type to a Go type expression
-func getGoType(field parser.Field) *Statement {
-	// Handle vector types
+func getGoType(field parser.Field) *jen.Statement {
 	if field.IsVector {
-		return Index().Add(getBaseGoType(field))
+		return jen.Index().Add(getBaseGoType(field))
 	}
-
 	return getBaseGoType(field)
 }
 
-// getBaseGoType returns the Go type for a FlatBuffers type
-func getBaseGoType(field parser.Field) *Statement {
-	// Handle special types
+func getBaseGoType(field parser.Field) *jen.Statement {
 	if field.IsString {
-		return String()
+		return jen.String()
 	}
-
-	if field.IsStruct || field.IsUnion {
-		return Op("*").Id(field.Type)
-	}
-
 	if field.IsEnum {
-		return Id(field.Type)
+		return jen.Id(field.Type)
 	}
 
-	// Handle primitive types
 	switch field.Type {
 	case "bool":
-		return Bool()
+		return jen.Bool()
 	case "byte":
-		return Int8()
+		return jen.Int8()
 	case "ubyte":
-		return Uint8()
+		return jen.Uint8()
 	case "short":
-		return Int16()
+		return jen.Int16()
 	case "ushort":
-		return Uint16()
+		return jen.Uint16()
 	case "int":
-		return Int32()
+		return jen.Int32()
 	case "uint":
-		return Uint32()
+		return jen.Uint32()
 	case "long":
-		return Int64()
+		return jen.Int64()
 	case "ulong":
-		return Uint64()
+		return jen.Uint64()
 	case "float":
-		return Float32()
+		return jen.Float32()
 	case "double":
-		return Float64()
+		return jen.Float64()
 	default:
 		if field.IsNested() {
-			return Id(toModelName(field.Type))
+			return jen.Id(toModelName(field.Type))
 		}
-		return Id(field.Type)
+		return jen.Id(field.Type)
 	}
 }
