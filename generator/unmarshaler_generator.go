@@ -45,9 +45,9 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string, 
 		}
 
 		for _, field := range def.Fields {
-			tableField := g.Id("t").Dot(toExportedName(field.Name))
 			excelField := Id("e").Dot(toExportedName(field.Name))
 			if field.IsVector {
+				tableField := g.Id("t").Dot(toExportedName(field.Name))
 				excelFieldLength := Id("e").Dot(toExportedName(field.Name) + "Length").Call()
 				// t.<fieldName> := make([]<fieldType>, excelFieldLength)
 				tableField.Op("=").Make(getGoType(field), excelFieldLength)
@@ -60,6 +60,12 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string, 
 						g.If(Op("!").Add(excelField).Call(Id("d"), Id("i"))).Block(
 							Return(Qual("errors", "New").Call(Lit("failed to unmarshal data"))),
 						)
+						if !withoutDecryption {
+							// t.<fieldName>[i].InitKey(t.FlatBuffer.TableKey)
+							g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Dot("InitKey").Call(
+								Id("t").Dot("FlatBuffer").Dot("TableKey"),
+							)
+						}
 						// t.<fieldName>[i].UnmarshalMessage(d)
 						g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Dot("UnmarshalMessage").Call(Id("d"))
 						return
@@ -77,9 +83,16 @@ func generateUnmarshalMessage(f *File, def parser.Definition, modelName string, 
 					g.Id("t").Dot(toExportedName(field.Name)).Index(Id("i")).Op("=").Add(excelFieldValue)
 				})
 			} else if field.IsNested() {
-				// t.<fieldName> = excelField(st)
-				tableField.Dot("UnmarshalMessage").Call(excelField.Call(Nil()))
+				if !withoutDecryption {
+					// t.<fieldName>.InitKey(t.FlatBuffer.TableKey)
+					g.Id("t").Dot(toExportedName(field.Name)).Dot("InitKey").Call(
+						Id("t").Dot("FlatBuffer").Dot("TableKey"),
+					)
+				}
+				// t.<fieldName>.UnmarshalMessage(excelField(nil))
+				g.Id("t").Dot(toExportedName(field.Name)).Dot("UnmarshalMessage").Call(excelField.Call(Nil()))
 			} else {
+				tableField := g.Id("t").Dot(toExportedName(field.Name))
 				// t.<fieldName> = excelField()
 				handleFieldType(tableField, field, excelField.Call())
 			}

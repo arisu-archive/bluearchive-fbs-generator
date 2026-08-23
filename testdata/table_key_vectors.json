@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "contract": {
+    "key_scope": "dto_tree",
+    "root_default": "derive_from_root_table_name",
+    "explicit_root_key": "preserve",
+    "nested_key": "inherit_parent",
+    "standalone_key": "derive_from_own_table_name",
+    "without_decryption": "no_key_initialization_or_propagation",
+    "whole_buffer_xor": "separate_preprocessing_step"
+  },
+  "key_derivation": [
+    {
+      "table": "AnimatorDataTable",
+      "xxhash32_hex": "f22d1b4f",
+      "table_key_hex": "0d2add2e63844b29"
+    },
+    {
+      "table": "AnimatorData",
+      "xxhash32_hex": "68943335",
+      "table_key_hex": "1609ee0e2cbed631"
+    },
+    {
+      "table": "AniStateData",
+      "xxhash32_hex": "c4353346",
+      "table_key_hex": "20d2e96da7695a2a"
+    },
+    {
+      "table": "AniEventData",
+      "xxhash32_hex": "a660abe9",
+      "table_key_hex": "ec148066c5b8f867"
+    }
+  ],
+  "field_conversion": {
+    "table_key_hex": "0d2add2e63844b29",
+    "wrong_child_key_hex": "ec148066c5b8f867",
+    "int32": {
+      "plaintext_signed": 16909060,
+      "encoded_signed": 803154185,
+      "wrong_child_decode_signed": 1230978533
+    },
+    "string": {
+      "plaintext": "event",
+      "plaintext_utf16le_hex": "6500760065006e007400",
+      "encoded_hex": "682aab2e06842529792a",
+      "encoded_base64": "aCqrLgaEJSl5Kg=="
+    }
+  }
+}
