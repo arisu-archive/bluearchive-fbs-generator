@@ -30,11 +30,3 @@ func GetFieldText(node *sitter.Node, fieldName string, content []byte) string {
 	}
 	return NodeText(fieldNode, content)
 }
-
-// isUpperFirstChar checks if the first character of a string is uppercase
-func isUpperFirstChar(s string) bool {
-	if len(s) > 0 {
-		return s[0] >= 'A' && s[0] <= 'Z'
-	}
-	return false
-}

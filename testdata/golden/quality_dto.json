@@ -1,0 +1,25 @@
+{
+  "file_name": "quality_dto.go",
+  "required_fragments": [
+    "package flatdata",
+    "type ChildDto struct",
+    "type QualityDto struct",
+    "UserID",
+    "Kind QualityKind",
+    "Kinds []QualityKind",
+    "Scores []int32",
+    "Enabled bool",
+    "Child ChildDto",
+    "Children []ChildDto",
+    "Labels []string",
+    "QualityAddUserId",
+    "t.Child.InitKey(t.FlatBuffer.TableKey)",
+    "if err := t.Child.UnmarshalMessage(child); err != nil",
+    "return fmt.Errorf(\"unmarshal children[%d]: %w\", i, err)",
+    "func encodeDTOString",
+    "GetRootAsQuality(data, 0)"
+  ],
+  "forbidden_fragments": [
+    "__"
+  ]
+}

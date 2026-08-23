@@ -114,12 +114,14 @@ func TestGenerateWithoutDecryptionOmitsTableKeyOperations(t *testing.T) {
 	file := generateNestedModel(t, true /* withoutDecryption */)
 	gotInitKey := countSelectorCalls(file, "InitKey")
 	gotCreateTableKey := countSelectorCalls(file, "CreateTableKey")
+	gotConvert := countSelectorCalls(file, "Convert")
 
-	if gotInitKey != 0 || gotCreateTableKey != 0 {
+	if gotInitKey != 0 || gotCreateTableKey != 0 || gotConvert != 0 {
 		t.Errorf(
-			"Generate(without decryption) key operation counts = (InitKey: %d, CreateTableKey: %d), want (InitKey: 0, CreateTableKey: 0)",
+			"Generate(without decryption) conversion operation counts = (InitKey: %d, CreateTableKey: %d, Convert: %d), want all zero",
 			gotInitKey,
 			gotCreateTableKey,
+			gotConvert,
 		)
 	}
 }
@@ -221,6 +223,8 @@ func generateNestedModel(t *testing.T, withoutDecryption bool) *ast.File {
 				Name: "Parent",
 				Type: parser.TypeTable,
 				Fields: []parser.Field{
+					{Name: "name", Type: "string", IsString: true},
+					{Name: "labels", Type: "string", IsVector: true, IsString: true},
 					{Name: "child", Type: "Child", IsTable: true},
 					{Name: "children", Type: "Child", IsVector: true, IsTable: true},
 				},
@@ -234,7 +238,7 @@ func generateNestedModel(t *testing.T, withoutDecryption bool) *ast.File {
 		t.Fatalf("Generate(nested schema, withoutDecryption=%t): %v", withoutDecryption, err)
 	}
 
-	path := filepath.Join(outputDir, "ParentDto.go")
+	path := filepath.Join(outputDir, "parent_dto.go")
 	file, err := goparser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
 		t.Fatalf("parse generated model %q: %v", path, err)
@@ -275,47 +279,43 @@ func methodReceiverName(method *ast.FuncDecl) string {
 func nestedKeyPropagation(t *testing.T, body *ast.BlockStmt) (int, int) {
 	t.Helper()
 
+	initPositions := make(map[string][]token.Pos)
+	ast.Inspect(body, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok || len(call.Args) != 1 {
+			return true
+		}
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "InitKey" || nodeString(t, call.Args[0]) != "t.FlatBuffer.TableKey" {
+			return true
+		}
+		receiver := nodeString(t, selector.X)
+		initPositions[receiver] = append(initPositions[receiver], call.Pos())
+		return true
+	})
+
 	var propagated int
 	var nested int
 	ast.Inspect(body, func(node ast.Node) bool {
-		block, ok := node.(*ast.BlockStmt)
+		call, ok := node.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
-
-		for i, statement := range block.List {
-			unmarshalCall, unmarshalReceiver, ok := selectorCall(statement, "UnmarshalMessage")
-			if !ok {
-				continue
-			}
-			nested++
-			unmarshalReceiverName := nodeString(t, unmarshalReceiver)
-			var wantArgument string
-			switch unmarshalReceiverName {
-			case "t.Child":
-				wantArgument = "e.Child(nil)"
-			case "t.Children[i]":
-				wantArgument = "d"
-			default:
-				continue
-			}
-			if len(unmarshalCall.Args) != 1 || nodeString(t, unmarshalCall.Args[0]) != wantArgument {
-				continue
-			}
-			if i == 0 {
-				continue
-			}
-
-			initCall, initReceiver, ok := selectorCall(block.List[i-1], "InitKey")
-			if !ok || nodeString(t, initReceiver) != unmarshalReceiverName {
-				continue
-			}
-			if len(initCall.Args) != 1 || nodeString(t, initCall.Args[0]) != "t.FlatBuffer.TableKey" {
-				continue
-			}
-			propagated++
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || selector.Sel.Name != "UnmarshalMessage" {
+			return true
 		}
-
+		receiver := nodeString(t, selector.X)
+		if receiver != "t.Child" && receiver != "t.Children[i]" {
+			return true
+		}
+		nested++
+		for _, position := range initPositions[receiver] {
+			if position < call.Pos() {
+				propagated++
+				break
+			}
+		}
 		return true
 	})
 

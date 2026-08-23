@@ -1,0 +1,23 @@
+namespace flatdata;
+
+enum QualityKind:int {
+  Unknown = 0,
+  Good = 1
+}
+
+table Child {
+  name:string;
+}
+
+table Quality {
+  user_id:int;
+  kind:QualityKind;
+  kinds:[QualityKind];
+  scores:[int];
+  enabled:bool;
+  child:Child;
+  children:[Child];
+  labels:[string];
+}
+
+root_type Quality;
