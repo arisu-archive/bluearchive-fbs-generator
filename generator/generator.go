@@ -139,10 +139,10 @@ func writeFile(file GeneratedFile, outputDir string) error {
 	return nil
 }
 
-// fieldConverter generates a qualified call that invokes the Convert function in the bluearchive-fbs-utils package.
-func fieldConverter(field jen.Code) *jen.Statement {
-	return jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Convert").Call(
-		field,
+// decodeValue generates a qualified call that invokes the Decode function in the bluearchive-fbs-utils package.
+func decodeValue(value jen.Code) *jen.Statement {
+	return jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Decode").Call(
+		value,
 		jen.Id("t").Dot("FlatBuffer").Dot("TableKey"),
 	)
 }

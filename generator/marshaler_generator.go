@@ -45,7 +45,7 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 				group.For(jen.Id("i").Op(":=").Range().Add(fieldAccessor)).BlockFunc(func(group *jen.Group) {
 					value := fieldAccessor.Clone().Index(jen.Id("i"))
 					if !withoutDecryption {
-						value = encodeString(value)
+						value = encodeValue(value)
 					}
 					group.Id(offsetsVariable).Index(jen.Id("i")).Op("=").Id("b").Dot("CreateString").Call(value)
 				})
@@ -82,7 +82,7 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 			case !field.IsVector && field.IsString:
 				value := fieldAccessor
 				if !withoutDecryption {
-					value = encodeString(value)
+					value = encodeValue(value)
 				}
 				group.Id(offsetVariable).Op(":=").Id("b").Dot("CreateString").Call(value)
 
@@ -100,10 +100,10 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 						goType = "Int32"
 						indexedField = jen.Int32().Call(indexedField)
 						if !withoutDecryption {
-							indexedField = fieldConverter(indexedField)
+							indexedField = encodeValue(indexedField)
 						}
 					} else if !withoutDecryption && field.IsPrimitive() && field.Type != "bool" {
-						indexedField = fieldConverter(indexedField)
+						indexedField = encodeValue(indexedField)
 					}
 					group.Id("b").Dot("Prepend" + goType).Call(indexedField)
 				})
@@ -123,12 +123,12 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 				fieldSetter(group, field, jen.Id(offsetVariable))
 			case field.IsEnum:
 				if !withoutDecryption {
-					fieldAccessor = jen.Id(field.Type).Call(fieldConverter(jen.Int32().Call(fieldAccessor)))
+					fieldAccessor = jen.Id(field.Type).Call(encodeValue(jen.Int32().Call(fieldAccessor)))
 				}
 				fieldSetter(group, field, fieldAccessor)
 			default:
 				if !withoutDecryption && field.Type != "bool" {
-					fieldAccessor = fieldConverter(fieldAccessor)
+					fieldAccessor = encodeValue(fieldAccessor)
 				}
 				fieldSetter(group, field, fieldAccessor)
 			}
@@ -138,10 +138,10 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 	file.Line()
 }
 
-// encodeString generates a qualified call that invokes the Encode function in
+// encodeValue generates a qualified call that invokes the Encode function in
 // the bluearchive-fbs-utils package. Emitting a package-level helper instead
 // would redeclare it when multiple schemas are generated into one package.
-func encodeString(value jen.Code) *jen.Statement {
+func encodeValue(value jen.Code) *jen.Statement {
 	return jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Encode").Call(
 		value,
 		jen.Id("t").Dot("FlatBuffer").Dot("TableKey"),

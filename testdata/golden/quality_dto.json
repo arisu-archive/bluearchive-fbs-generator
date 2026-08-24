@@ -8,6 +8,7 @@
     "Kind QualityKind",
     "Kinds []QualityKind",
     "Scores []int32",
+    "Rate float32",
     "Enabled bool",
     "Child ChildDto",
     "Children []ChildDto",
@@ -17,10 +18,12 @@
     "if err := t.Child.UnmarshalMessage(child); err != nil",
     "return fmt.Errorf(\"unmarshal children[%d]: %w\", i, err)",
     "fbsutils.Encode(",
+    "fbsutils.Decode(",
     "GetRootAsQuality(data, 0)"
   ],
   "forbidden_fragments": [
     "__",
-    "encodeDTOString"
+    "encodeDTOString",
+    "fbsutils.Convert("
   ]
 }

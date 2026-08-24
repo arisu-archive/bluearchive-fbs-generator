@@ -114,14 +114,16 @@ func TestGenerateWithoutDecryptionOmitsTableKeyOperations(t *testing.T) {
 	file := generateNestedModel(t, true /* withoutDecryption */)
 	gotInitKey := countSelectorCalls(file, "InitKey")
 	gotCreateTableKey := countSelectorCalls(file, "CreateTableKey")
-	gotConvert := countSelectorCalls(file, "Convert")
+	gotEncode := countSelectorCalls(file, "Encode")
+	gotDecode := countSelectorCalls(file, "Decode")
 
-	if gotInitKey != 0 || gotCreateTableKey != 0 || gotConvert != 0 {
+	if gotInitKey != 0 || gotCreateTableKey != 0 || gotEncode != 0 || gotDecode != 0 {
 		t.Errorf(
-			"Generate(without decryption) conversion operation counts = (InitKey: %d, CreateTableKey: %d, Convert: %d), want all zero",
+			"Generate(without decryption) conversion operation counts = (InitKey: %d, CreateTableKey: %d, Encode: %d, Decode: %d), want all zero",
 			gotInitKey,
 			gotCreateTableKey,
-			gotConvert,
+			gotEncode,
+			gotDecode,
 		)
 	}
 }

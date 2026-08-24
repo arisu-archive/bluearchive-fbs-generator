@@ -151,9 +151,9 @@ func TestRenderConvertsSmallScalars(t *testing.T) {
 		"Small int16",
 		"UnsignedSmall uint16",
 		"Smalls []int16",
-		"fbsutils.Convert(t.Small, t.FlatBuffer.TableKey)",
-		"fbsutils.Convert(e.Small(), t.FlatBuffer.TableKey)",
-		"b.PrependInt16(fbsutils.Convert(t.Smalls[i], t.FlatBuffer.TableKey))",
+		"fbsutils.Encode(t.Small, t.FlatBuffer.TableKey)",
+		"fbsutils.Decode(e.Small(), t.FlatBuffer.TableKey)",
+		"b.PrependInt16(fbsutils.Encode(t.Smalls[i], t.FlatBuffer.TableKey))",
 	} {
 		if !strings.Contains(source, fragment) {
 			t.Errorf("Render(small scalars) source missing %q; source:\n%s", fragment, files[0].Content)
@@ -511,14 +511,14 @@ func TestSharedTableKeyVectorsMatchFBSUtils(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hex.DecodeString(child key) error = %v, want nil", err)
 	}
-	if got := fbsutils.Convert(conversion.Int32.EncodedSigned, key); got != conversion.Int32.PlaintextSigned {
-		t.Errorf("Convert(encoded int32, root key) = %d, want %d", got, conversion.Int32.PlaintextSigned)
+	if got := fbsutils.Decode(conversion.Int32.EncodedSigned, key); got != conversion.Int32.PlaintextSigned {
+		t.Errorf("Decode(encoded int32, root key) = %d, want %d", got, conversion.Int32.PlaintextSigned)
 	}
-	if got := fbsutils.Convert(conversion.Int32.EncodedSigned, wrongKey); got != conversion.Int32.WrongChildDecodeSigned {
-		t.Errorf("Convert(encoded int32, child key) = %d, want %d", got, conversion.Int32.WrongChildDecodeSigned)
+	if got := fbsutils.Decode(conversion.Int32.EncodedSigned, wrongKey); got != conversion.Int32.WrongChildDecodeSigned {
+		t.Errorf("Decode(encoded int32, child key) = %d, want %d", got, conversion.Int32.WrongChildDecodeSigned)
 	}
-	if got := fbsutils.Convert(conversion.String.EncodedBase64, key); got != conversion.String.Plaintext {
-		t.Errorf("Convert(encoded string, root key) = %q, want %q", got, conversion.String.Plaintext)
+	if got := fbsutils.Decode(conversion.String.EncodedBase64, key); got != conversion.String.Plaintext {
+		t.Errorf("Decode(encoded string, root key) = %q, want %q", got, conversion.String.Plaintext)
 	}
 }
 
@@ -528,6 +528,7 @@ func TestQualityDtoRoundTrip(t *testing.T) {
 		Kind:     QualityKindGood,
 		Kinds:    []QualityKind{QualityKindUnknown, QualityKindGood},
 		Scores:   []int32{7, -3},
+		Rate:     1.5,
 		Enabled:  true,
 		Child:    ChildDto{Name: "single"},
 		Children: []ChildDto{{Name: "first"}, {Name: "second"}},
@@ -550,6 +551,9 @@ func TestQualityDtoRoundTrip(t *testing.T) {
 	}
 	if len(got.Scores) != 2 || got.Scores[0] != 7 || got.Scores[1] != -3 || !got.Enabled {
 		t.Errorf("Unmarshal(Marshal()) primitive values = (scores: %v, enabled: %t), want ([7 -3], true)", got.Scores, got.Enabled)
+	}
+	if got.Rate != 1.5 {
+		t.Errorf("Unmarshal(Marshal()) rate = %v, want 1.5", got.Rate)
 	}
 	if len(got.Children) != 2 || got.Children[0].Name != "first" || got.Children[1].Name != "second" {
 		t.Errorf("Unmarshal(Marshal()) children = %+v, want first and second", got.Children)

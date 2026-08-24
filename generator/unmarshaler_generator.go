@@ -18,13 +18,13 @@ func generateUnmarshalMessage(file *jen.File, definition parser.Definition, mode
 		}
 		switch {
 		case field.IsEnum:
-			tableField.Op("=").Add(jen.Id(field.Type).Call(fieldConverter(jen.Int32().Call(value))))
+			tableField.Op("=").Add(jen.Id(field.Type).Call(decodeValue(jen.Int32().Call(value))))
 		case field.IsString:
-			tableField.Op("=").Add(fieldConverter(jen.String().Call(value)))
+			tableField.Op("=").Add(decodeValue(jen.String().Call(value)))
 		case field.IsPrimitive() && field.Type == "bool":
 			tableField.Op("=").Add(value)
 		default:
-			tableField.Op("=").Add(fieldConverter(value))
+			tableField.Op("=").Add(decodeValue(value))
 		}
 	}
 
@@ -64,14 +64,14 @@ func generateUnmarshalMessage(file *jen.File, definition parser.Definition, mode
 					case field.IsString:
 						fieldValue = jen.String().Call(fieldValue)
 						if !withoutDecryption {
-							fieldValue = fieldConverter(fieldValue)
+							fieldValue = decodeValue(fieldValue)
 						}
 					case field.IsEnum:
 						if !withoutDecryption {
-							fieldValue = jen.Id(field.Type).Call(fieldConverter(jen.Int32().Call(fieldValue)))
+							fieldValue = jen.Id(field.Type).Call(decodeValue(jen.Int32().Call(fieldValue)))
 						}
 					case !withoutDecryption && field.IsPrimitive() && field.Type != "bool":
-						fieldValue = fieldConverter(fieldValue)
+						fieldValue = decodeValue(fieldValue)
 					}
 					group.Id("t").Dot(toExportedName(field.Name)).Index(jen.Id("i")).Op("=").Add(fieldValue)
 				})
