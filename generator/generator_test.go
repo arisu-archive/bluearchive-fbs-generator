@@ -42,17 +42,6 @@ func TestRenderRejectsUnsupportedSchema(t *testing.T) {
 			options:    Options{PackageName: "flatdata"},
 		},
 		{
-			name: "encrypted unsupported scalar",
-			definition: parser.Definition{
-				Name: "Quality",
-				Type: parser.TypeTable,
-				Fields: []parser.Field{
-					{Name: "small", Type: "short"},
-				},
-			},
-			options: Options{PackageName: "flatdata"},
-		},
-		{
 			name: "referenced struct",
 			definition: parser.Definition{
 				Name: "Quality",
@@ -133,7 +122,7 @@ func TestRenderRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-func TestRenderWithoutDecryptionAllowsUnconvertedScalar(t *testing.T) {
+func TestRenderConvertsSmallScalars(t *testing.T) {
 	t.Parallel()
 
 	schema := &parser.Schema{
@@ -143,14 +132,32 @@ func TestRenderWithoutDecryptionAllowsUnconvertedScalar(t *testing.T) {
 				Name: "Quality",
 				Type: parser.TypeTable,
 				Fields: []parser.Field{
+					{Name: "signed_small", Type: "byte"},
 					{Name: "small", Type: "short"},
+					{Name: "unsigned_small", Type: "ushort"},
+					{Name: "smalls", Type: "short", IsVector: true},
 				},
 			},
 		},
 	}
-	_, err := Render(schema, Options{PackageName: "flatdata", WithoutDecryption: true})
+
+	files, err := Render(schema, Options{PackageName: "flatdata"})
 	if err != nil {
-		t.Errorf("Render(short without decryption) error = %v, want nil", err)
+		t.Fatalf("Render(small scalars) error = %v, want nil", err)
+	}
+	source := strings.Join(strings.Fields(string(files[0].Content)), " ")
+	for _, fragment := range []string{
+		"SignedSmall int8",
+		"Small int16",
+		"UnsignedSmall uint16",
+		"Smalls []int16",
+		"fbsutils.Convert(t.Small, t.FlatBuffer.TableKey)",
+		"fbsutils.Convert(e.Small(), t.FlatBuffer.TableKey)",
+		"b.PrependInt16(fbsutils.Convert(t.Smalls[i], t.FlatBuffer.TableKey))",
+	} {
+		if !strings.Contains(source, fragment) {
+			t.Errorf("Render(small scalars) source missing %q; source:\n%s", fragment, files[0].Content)
+		}
 	}
 }
 
