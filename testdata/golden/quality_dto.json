@@ -16,10 +16,11 @@
     "t.Child.InitKey(t.FlatBuffer.TableKey)",
     "if err := t.Child.UnmarshalMessage(child); err != nil",
     "return fmt.Errorf(\"unmarshal children[%d]: %w\", i, err)",
-    "func encodeDTOString",
+    "fbsutils.Encode(",
     "GetRootAsQuality(data, 0)"
   ],
   "forbidden_fragments": [
-    "__"
+    "__",
+    "encodeDTOString"
   ]
 }

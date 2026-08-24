@@ -27,25 +27,10 @@ func buildModelFile(s *parser.Schema, packageName string, withoutDecryption bool
 			continue
 		}
 	}
-	if written && !withoutDecryption && schemaHasStringFields(s) {
-		generateStringEncoder(file)
-	}
-
 	if !written {
 		return file, "", false
 	}
 	return file, toFileName(s.FileName), true
-}
-
-func schemaHasStringFields(s *parser.Schema) bool {
-	for _, definition := range s.Definitions {
-		for _, field := range definition.Fields {
-			if field.IsString {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func generateTableType(file *jen.File, definition parser.Definition) {

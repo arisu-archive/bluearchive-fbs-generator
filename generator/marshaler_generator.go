@@ -138,39 +138,14 @@ func generateMarshalMessage(file *jen.File, definition parser.Definition, modelN
 	file.Line()
 }
 
+// encodeString generates a qualified call that invokes the Encode function in
+// the bluearchive-fbs-utils package. Emitting a package-level helper instead
+// would redeclare it when multiple schemas are generated into one package.
 func encodeString(value jen.Code) *jen.Statement {
-	return jen.Id("encodeDTOString").Call(
+	return jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "Encode").Call(
 		value,
 		jen.Id("t").Dot("FlatBuffer").Dot("TableKey"),
 	)
-}
-
-func generateStringEncoder(file *jen.File) {
-	file.Func().Id("encodeDTOString").Params(
-		jen.Id("value").String(),
-		jen.Id("key").Index().Byte(),
-	).String().BlockFunc(func(group *jen.Group) {
-		group.If(jen.Id("value").Op("==").Lit("")).Block(jen.Return(jen.Lit("")))
-		group.Id("codeUnits").Op(":=").Qual("unicode/utf16", "Encode").Call(
-			jen.Index().Rune().Call(jen.Id("value")),
-		)
-		group.Id("raw").Op(":=").Make(jen.Index().Byte(), jen.Len(jen.Id("codeUnits")).Op("*").Lit(2))
-		group.For(jen.Id("i").Op(":=").Range().Id("codeUnits")).Block(
-			jen.Qual("encoding/binary", "LittleEndian").Dot("PutUint16").Call(
-				jen.Id("raw").Index(jen.Id("i").Op("*").Lit(2).Op(":")),
-				jen.Id("codeUnits").Index(jen.Id("i")),
-			),
-		)
-		group.Return(
-			jen.Qual("encoding/base64", "StdEncoding").Dot("EncodeToString").Call(
-				jen.Qual("github.com/arisu-archive/bluearchive-fbs-utils", "XorBytes").Call(
-					jen.Id("raw"),
-					jen.Id("key"),
-				),
-			),
-		)
-	})
-	file.Line()
 }
 
 func prependOffsets(group *jen.Group, offsetsVariable string) {
