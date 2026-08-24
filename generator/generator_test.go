@@ -42,17 +42,6 @@ func TestRenderRejectsUnsupportedSchema(t *testing.T) {
 			options:    Options{PackageName: "flatdata"},
 		},
 		{
-			name: "encrypted unsupported scalar",
-			definition: parser.Definition{
-				Name: "Quality",
-				Type: parser.TypeTable,
-				Fields: []parser.Field{
-					{Name: "small", Type: "short"},
-				},
-			},
-			options: Options{PackageName: "flatdata"},
-		},
-		{
 			name: "referenced struct",
 			definition: parser.Definition{
 				Name: "Quality",
@@ -133,7 +122,7 @@ func TestRenderRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-func TestRenderWithoutDecryptionAllowsUnconvertedScalar(t *testing.T) {
+func TestRenderConvertsSmallScalars(t *testing.T) {
 	t.Parallel()
 
 	schema := &parser.Schema{
@@ -143,14 +132,32 @@ func TestRenderWithoutDecryptionAllowsUnconvertedScalar(t *testing.T) {
 				Name: "Quality",
 				Type: parser.TypeTable,
 				Fields: []parser.Field{
+					{Name: "signed_small", Type: "byte"},
 					{Name: "small", Type: "short"},
+					{Name: "unsigned_small", Type: "ushort"},
+					{Name: "smalls", Type: "short", IsVector: true},
 				},
 			},
 		},
 	}
-	_, err := Render(schema, Options{PackageName: "flatdata", WithoutDecryption: true})
+
+	files, err := Render(schema, Options{PackageName: "flatdata"})
 	if err != nil {
-		t.Errorf("Render(short without decryption) error = %v, want nil", err)
+		t.Fatalf("Render(small scalars) error = %v, want nil", err)
+	}
+	source := strings.Join(strings.Fields(string(files[0].Content)), " ")
+	for _, fragment := range []string{
+		"SignedSmall int8",
+		"Small int16",
+		"UnsignedSmall uint16",
+		"Smalls []int16",
+		"fbsutils.Convert(t.Small, t.FlatBuffer.TableKey)",
+		"fbsutils.Convert(e.Small(), t.FlatBuffer.TableKey)",
+		"b.PrependInt16(fbsutils.Convert(t.Smalls[i], t.FlatBuffer.TableKey))",
+	} {
+		if !strings.Contains(source, fragment) {
+			t.Errorf("Render(small scalars) source missing %q; source:\n%s", fragment, files[0].Content)
+		}
 	}
 }
 
@@ -223,6 +230,70 @@ func TestRenderMatchesQualityGoldenContract(t *testing.T) {
 			t.Errorf("Render(%q) source contains forbidden golden fragment %q", schemaPath, fragment)
 		}
 	}
+}
+
+func TestRenderSchemasShareOnePackageWithoutRedeclaration(t *testing.T) {
+	t.Parallel()
+
+	makeSchema := func(name string) *parser.Schema {
+		return &parser.Schema{
+			FileName: name,
+			Definitions: []parser.Definition{
+				{
+					Name: name,
+					Type: parser.TypeTable,
+					Fields: []parser.Field{
+						{Name: "label", Type: "string", IsString: true},
+					},
+				},
+			},
+		}
+	}
+
+	declared := map[string]string{}
+	for _, schema := range []*parser.Schema{makeSchema("First"), makeSchema("Second")} {
+		files, err := Render(schema, Options{PackageName: "flatdata"})
+		if err != nil {
+			t.Fatalf("Render(%q) error = %v, want nil", schema.FileName, err)
+		}
+		for _, generated := range files {
+			file, err := goParser.ParseFile(token.NewFileSet(), generated.Name, generated.Content, 0)
+			if err != nil {
+				t.Fatalf("ParseFile(%q) error = %v, want nil", generated.Name, err)
+			}
+			for _, name := range packageLevelNames(file) {
+				if previous, exists := declared[name]; exists {
+					t.Errorf("Render generated package-level %q in both %q and %q", name, previous, generated.Name)
+					continue
+				}
+				declared[name] = generated.Name
+			}
+		}
+	}
+}
+
+func packageLevelNames(file *goast.File) []string {
+	var names []string
+	for _, declaration := range file.Decls {
+		switch decl := declaration.(type) {
+		case *goast.FuncDecl:
+			if decl.Recv == nil {
+				names = append(names, decl.Name.Name)
+			}
+		case *goast.GenDecl:
+			for _, specification := range decl.Specs {
+				switch spec := specification.(type) {
+				case *goast.TypeSpec:
+					names = append(names, spec.Name.Name)
+				case *goast.ValueSpec:
+					for _, identifier := range spec.Names {
+						names = append(names, identifier.Name)
+					}
+				}
+			}
+		}
+	}
+	return names
 }
 
 func TestRenderHandlesNestedTablesSafely(t *testing.T) {
@@ -379,7 +450,7 @@ const generatedModule = `module generatedtest
 go 1.23.0
 
 require (
-	github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20260406083956-7eadd04b03be
+	github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20260823204751-dd41aefb457e
 	github.com/google/flatbuffers v25.12.19+incompatible
 )
 `

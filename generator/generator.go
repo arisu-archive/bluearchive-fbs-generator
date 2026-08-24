@@ -119,19 +119,6 @@ func validateSchema(s *parser.Schema, options Options) error {
 					field.Type,
 				)
 			}
-			if options.WithoutDecryption {
-				continue
-			}
-			switch field.Type {
-			case "byte", "short", "ushort":
-				return fmt.Errorf(
-					"%w: encrypted field %q.%s uses scalar %q unsupported by fbsutils.Convert",
-					ErrUnsupportedSchema,
-					definition.Name,
-					field.Name,
-					field.Type,
-				)
-			}
 		}
 	}
 	return nil
